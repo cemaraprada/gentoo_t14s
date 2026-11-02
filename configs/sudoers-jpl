@@ -1,0 +1,3 @@
+# /etc/sudoers.d/00-jpl
+# chmod 0440 after copying.
+jpl ALL=(ALL:ALL) ALL

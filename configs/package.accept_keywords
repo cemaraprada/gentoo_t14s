@@ -1,0 +1,8 @@
+# /etc/portage/package.accept_keywords/gentoo-t14s
+# Only needed if your snapshot still marks one of these as testing (~amd64).
+# Check with: emerge --ask <package>
+# Uncomment the relevant line, then retry.
+#
+#app-misc/fastfetch ~amd64
+#app-shells/starship ~amd64
+#media-fonts/symbols-nerd-font ~amd64

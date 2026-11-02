@@ -1,0 +1,428 @@
+================================================================================
+ GENTOO OPENRC + KDE PLASMA 6 - INSTALL NOTES
+ Lenovo ThinkPad T14s Gen 2i (20WNS51A00)
+ Intel Core i5-1145G7 / Iris Xe / 16 GiB / Micron 2300 256 GB NVMe
+================================================================================
+
+CONFIG FILES PROVIDED
+---------------------
+  make.conf                  -> /etc/portage/make.conf
+  gentoo.conf                -> /etc/portage/binrepos.conf/gentoo.conf
+  package.use                -> /etc/portage/package.use/gentoo-t14s
+  packages.txt               -> explicit @world package list
+  configs/kernel-install.conf -> /etc/kernel/install.conf
+  configs/dracut-uki.conf    -> /etc/dracut.conf.d/uki.conf
+  configs/zram-init.conf     -> /etc/conf.d/zram-init
+  configs/display-manager.conf -> /etc/conf.d/display-manager
+  configs/keymaps            -> /etc/conf.d/keymaps
+  configs/hostname           -> /etc/conf.d/hostname
+  configs/fstab.template     -> /etc/fstab (edit UUIDs)
+  configs/xorg-keyboard.conf -> /etc/X11/xorg.conf.d/00-keyboard.conf
+  configs/sudoers-jpl        -> /etc/sudoers.d/00-jpl
+  configs/locale.gen.append  -> append to /etc/locale.gen
+  configs/package.accept_keywords -> optional ~amd64 overrides
+  configs/sddm-wayland-fallback.conf -> optional SDDM Wayland fallback
+
+NOTE: "gentoo.conf" here means /etc/portage/binrepos.conf/gentoo.conf
+      (the binary package host). The ebuild repository file is
+      /etc/portage/repos.conf/gentoo.conf and comes with stage3.
+
+================================================================================
+ 0. BEFORE REBOOTING
+================================================================================
+
+Copy this whole directory to a USB stick or another machine that the Gentoo
+live environment can access:
+
+  cp -r /home/jpl/gentoo-config /run/media/$USER/<USB>/
+
+Back up anything you need from the current Arch install if you are wiping it:
+
+  rsync -aHAX /home/jpl /run/media/$USER/<USB>/jpl-backup/
+
+WARNING
+-------
+The partition commands in step 2 erase the entire /dev/nvme0n1 disk.
+If you want to keep Arch and dual-boot, STOP and make a different plan.
+XFS cannot be shrunk, so dual-boot would require backing up/reinstalling.
+Do not copy the current PARTUUID/UUID values; new filesystems get new ones.
+
+================================================================================
+ 1. BOOT THE GENTOO LIVE ENVIRONMENT
+================================================================================
+
+Use the Gentoo OpenRC admincd or minimal ISO, booted in UEFI mode.
+Configure networking:
+
+  net-setup
+  # or, on a livegui image:
+  nmtui
+  ping -c3 gentoo.org
+
+================================================================================
+ 2. PARTITION AND FORMAT  (DESTRUCTIVE)
+================================================================================
+
+Check the device name first:
+
+  lsblk
+
+Expected device: /dev/nvme0n1
+
+  parted -s /dev/nvme0n1 mklabel gpt
+  parted -s /dev/nvme0n1 mkpart ESP fat32 1MiB 1025MiB
+  parted -s /dev/nvme0n1 set 1 esp on
+  parted -s /dev/nvme0n1 mkpart root xfs 1025MiB 100%
+  mkfs.vfat -F32 /dev/nvme0n1p1
+  mkfs.xfs -f /dev/nvme0n1p2
+
+  mount /dev/nvme0n1p2 /mnt/gentoo
+  mkdir -p /mnt/gentoo/boot
+  mount /dev/nvme0n1p1 /mnt/gentoo/boot
+
+This mirrors the current Arch layout:
+  p1  1 GiB FAT32 ESP   -> /boot
+  p2  remaining XFS     -> /
+
+================================================================================
+ 3. INSTALL STAGE3 (OpenRC)
+================================================================================
+
+  cd /mnt/gentoo
+  wget https://distfiles.gentoo.org/releases/amd64/autobuilds/latest-stage3-amd64-openrc.txt
+  cat latest-stage3-amd64-openrc.txt
+
+Read the path shown in that file, then download it:
+
+  wget https://distfiles.gentoo.org/releases/amd64/autobuilds/<path-from-file>
+  tar xpvf stage3-amd64-openrc-*.tar.xz --xattrs-include='*.*' --numeric-owner
+
+================================================================================
+ 4. COPY THE CONFIG FILES INTO THE NEW ROOT
+================================================================================
+
+Replace /path/to/gentoo-config with the USB/mounted path.
+
+  mkdir -p /mnt/gentoo/etc/portage/binrepos.conf
+  mkdir -p /mnt/gentoo/etc/portage/package.use
+  mkdir -p /mnt/gentoo/root/gentoo-config
+
+  cp /path/to/gentoo-config/make.conf /mnt/gentoo/etc/portage/make.conf
+  cp /path/to/gentoo-config/gentoo.conf /mnt/gentoo/etc/portage/binrepos.conf/gentoo.conf
+  cp /path/to/gentoo-config/package.use /mnt/gentoo/etc/portage/package.use/gentoo-t14s
+  cp -r /path/to/gentoo-config/* /mnt/gentoo/root/gentoo-config/
+
+================================================================================
+ 5. CHROOT AND UPDATE THE BASE SYSTEM
+================================================================================
+
+  cp --dereference /etc/resolv.conf /mnt/gentoo/etc/
+  mount --types proc /proc /mnt/gentoo/proc
+  mount --rbind /sys /mnt/gentoo/sys
+  mount --make-rslave /mnt/gentoo/sys
+  mount --rbind /dev /mnt/gentoo/dev
+  mount --make-rslave /mnt/gentoo/dev
+  mount --bind /run /mnt/gentoo/run
+  mount --make-slave /mnt/gentoo/run
+
+  chroot /mnt/gentoo /bin/bash
+  source /etc/profile
+  export PS1="(chroot) ${PS1}"
+
+  emerge-webrsync
+  eselect profile set default/linux/amd64/23.0/desktop/plasma
+  emerge --ask --verbose --update --deep --newuse @world
+
+Note:
+  The official binary host is used first (x86-64-v3, with baseline fallback).
+  OpenRC/elogind USE flags do not match the systemd-built KDE binpkgs exactly,
+  so some KDE/Qt packages may compile from source. That is expected.
+
+Verify CPU flags:
+
+  emerge --ask app-portage/cpuid2cpuflags
+  cpuid2cpuflags
+
+The CPU_FLAGS_X86 line in make.conf was generated for this i5-1145G7.
+Adjust only if cpuid2cpuflags reports a difference.
+
+================================================================================
+ 6. LOCALE, TIMEZONE, HOSTNAME, KEYMAP
+================================================================================
+
+Locale:
+
+  cat /root/gentoo-config/configs/locale.gen.append >> /etc/locale.gen
+  locale-gen
+  eselect locale set en_US.utf8
+  env-update && source /etc/profile
+  export PS1="(chroot) ${PS1}"
+
+Timezone (RTC is UTC):
+
+  ln -sf /usr/share/zoneinfo/Asia/Singapore /etc/localtime
+  hwclock --systohc
+
+Hostname and console keymap:
+
+  cp /root/gentoo-config/configs/hostname /etc/conf.d/hostname
+  cp /root/gentoo-config/configs/keymaps /etc/conf.d/keymaps
+
+Keyboard for X/XWayland (terminate:ctrl_alt_bksp):
+
+  mkdir -p /etc/X11/xorg.conf.d
+  cp /root/gentoo-config/configs/xorg-keyboard.conf /etc/X11/xorg.conf.d/00-keyboard.conf
+
+================================================================================
+ 7. FSTAB
+================================================================================
+
+Get the new UUIDs:
+
+  blkid /dev/nvme0n1p1 /dev/nvme0n1p2
+
+Copy and edit the template:
+
+  cp /root/gentoo-config/configs/fstab.template /etc/fstab
+  nano /etc/fstab
+
+Replace <ROOT_UUID> and <ESP_UUID>. Result should look like:
+
+  UUID=<root-uuid> /     xfs  rw,relatime,inode64,logbufs=8,logbsize=32k,noquota 0 1
+  UUID=<esp-uuid>  /boot vfat rw,relatime,fmask=0177,dmask=0077,codepage=437,iocharset=ascii,shortname=mixed,utf8,errors=remount-ro 0 2
+
+Get the root PARTUUID for the kernel command line:
+
+  blkid -s PARTUUID -o value /dev/nvme0n1p2
+
+================================================================================
+ 8. KERNEL, FIRMWARE, UKI, SYSTEMD-BOOT
+================================================================================
+
+Install the binary kernel, installkernel, dracut and firmware:
+
+  emerge --ask sys-kernel/gentoo-kernel-bin sys-kernel/installkernel sys-kernel/dracut
+  emerge --ask sys-kernel/linux-firmware sys-firmware/sof-firmware sys-firmware/intel-microcode
+
+Copy the UKI configs:
+
+  cp /root/gentoo-config/configs/kernel-install.conf /etc/kernel/install.conf
+  mkdir -p /etc/dracut.conf.d
+  cp /root/gentoo-config/configs/dracut-uki.conf /etc/dracut.conf.d/uki.conf
+  nano /etc/dracut.conf.d/uki.conf
+
+dracut-uki.conf must contain the NEW root PARTUUID:
+
+  uefi="yes"
+  compress="zstd"
+  force_drivers+=" i915 "
+  kernel_cmdline="root=PARTUUID=<ROOT_PARTUUID> rw rootfstype=xfs quiet splash zswap.enabled=0"
+
+Build the UKI and install systemd-boot:
+
+  emerge --config sys-kernel/gentoo-kernel-bin
+  bootctl --esp-path=/boot install
+
+  ls -l /boot/EFI/Linux/
+  bootctl list
+
+You should see a gentoo-*.efi file, similar to the current Arch UKI.
+Optional: same zero timeout as the current machine:
+
+  printf 'timeout 0\n' > /boot/loader/loader.conf
+
+If bootctl did not create an EFI entry:
+
+  efibootmgr --create --disk /dev/nvme0n1 --part 1 \
+    --label "Gentoo" --loader '\EFI\systemd\systemd-bootx64.efi'
+
+================================================================================
+ 9. ZRAM, SERVICES, USER, SUDO
+================================================================================
+
+zram (4 GiB, zstd, matching the current Arch zram0):
+
+  cp /root/gentoo-config/configs/zram-init.conf /etc/conf.d/zram-init
+  rc-update add zram-init boot
+  rc-service zram-init start
+
+Enable services:
+
+  rc-update add elogind boot
+  rc-update add dbus default
+  rc-update add NetworkManager default
+  rc-update add bluetooth default
+  rc-update add power-profiles-daemon default
+  rc-update add fwupd default
+  rc-update add fprintd default
+  rc-update add plymouth boot
+
+If fwupd or fprintd has no OpenRC init script, skip that line; they are
+D-Bus activated.
+
+Create user jpl (UID will normally be 1000), sudo access:
+
+  useradd -m -G wheel,video,render,input,pipewire -s /bin/bash jpl
+  passwd jpl
+  mkdir -p /etc/sudoers.d
+  cp /root/gentoo-config/configs/sudoers-jpl /etc/sudoers.d/00-jpl
+  chmod 0440 /etc/sudoers.d/00-jpl
+
+================================================================================
+ 10. KDE PLASMA AND APPLICATIONS
+================================================================================
+
+  cp /root/gentoo-config/packages.txt /root/packages.txt
+  emerge --ask --verbose $(grep -vE '^[[:space:]]*(#|$)' /root/packages.txt)
+
+This installs:
+  - trimmed kde-plasma/plasma-meta (Wayland, no kwin-x11)
+  - Dolphin, Ark, Kate, Konsole, Spectacle, Elisa
+  - Plasma NM/PA, BlueDevil, PowerDevil, System Settings, KScreen
+  - PipeWire + WirePlumber + JACK/Pulse compatibility
+  - NetworkManager, BlueZ, firmware, fonts, Chrome and tools
+
+If a package is still ~amd64 on your snapshot, add it to
+/etc/portage/package.accept_keywords/gentoo-t14s. The provided
+configs/package.accept_keywords has examples.
+
+Configure SDDM:
+
+  cp /root/gentoo-config/configs/display-manager.conf /etc/conf.d/display-manager
+  usermod -aG video sddm
+  rc-update add display-manager default
+
+SDDM Wayland fallback only if the normal greeter fails:
+  see configs/sddm-wayland-fallback.conf
+  optional: emerge sys-auth/seatd; rc-update add seatd default;
+            usermod -aG seat sddm; usermod -aG seat jpl
+
+Plasma 6 defaults to Wayland. The session file is
+/usr/share/wayland-sessions/plasma.desktop.
+
+================================================================================
+ 11. PIPEWIRE USER SERVICES (after first login as jpl)
+================================================================================
+
+  rc-update add -U pipewire default
+  rc-update add -U pipewire-pulse default
+  rc-update add -U wireplumber default
+
+Check:
+
+  pactl info | grep 'Server Name'
+  # expected: PulseAudio (on PipeWire ...)
+
+Alternative if user services are unavailable:
+  gentoo-pipewire-launcher
+or add it to KDE autostart.
+
+================================================================================
+ 12. POST-INSTALL - MATCH THE ARCH MACHINE
+================================================================================
+
+Power profile (current machine reports "performance"):
+
+  sudo powerprofilesctl set performance
+
+Bluetooth (currently soft-blocked on Arch):
+
+  sudo rfkill unblock bluetooth
+  sudo rc-service bluetooth start
+
+Fingerprint (optional; Synaptics 06cb:00f9):
+
+  fprintd-enroll jpl
+  fprintd-list jpl
+
+Firmware updates:
+
+  sudo fwupdmgr get-devices
+  sudo fwupdmgr refresh --force
+  sudo fwupdmgr update
+
+Fonts:
+
+  fc-cache -fv
+
+Starship prompt, add to /home/jpl/.bashrc:
+
+  eval "$(starship init bash)"
+
+Weekly TRIM (matching Arch fstrim.timer):
+
+  emerge --ask sys-process/cronie
+  rc-update add cronie default
+  echo '0 3 * * 0 root /sbin/fstrim -av' > /etc/cron.d/fstrim
+
+Browser check:
+
+  google-chrome --version
+
+================================================================================
+ 13. REBOOT
+================================================================================
+
+  exit
+  umount -R /mnt/gentoo
+  reboot
+
+Remove the USB. Select the systemd-boot / Gentoo entry in UEFI if needed.
+
+================================================================================
+ ARCH -> GENTOO PACKAGE MAP (highlights)
+================================================================================
+
+  linux                       -> sys-kernel/gentoo-kernel-bin
+  linux-firmware              -> sys-kernel/linux-firmware
+  intel-ucode                 -> sys-firmware/intel-microcode
+  sof-firmware                -> sys-firmware/sof-firmware
+  mkinitcpio + UKI            -> sys-kernel/dracut + installkernel[uki]
+  plasma-desktop              -> kde-plasma/plasma-meta (trimmed)
+  plasma-login-manager        -> x11-misc/sddm on OpenRC
+  zram-generator              -> sys-block/zram-init
+  pipewire + JACK + Pulse     -> media-video/pipewire[sound-server,pipewire-alsa,jack-sdk]
+  gst-plugin-pipewire         -> media-video/pipewire[gstreamer]
+  intel-media-driver          -> media-libs/libva-intel-media-driver
+  vulkan-intel                -> Mesa ANV (VIDEO_CARDS="intel" + USE="vulkan")
+  mesa-utils                  -> x11-apps/mesa-progs
+  ttf-jetbrains-mono-nerd     -> media-fonts/jetbrains-mono + media-fonts/symbols-nerd-font
+  elisa                       -> media-sound/elisa
+  pacman-contrib              -> app-portage/gentoolkit
+  yay                         -> no direct equivalent; use overlays
+  google-chrome               -> www-client/google-chrome
+
+For the exact patched JetBrains Mono Nerd Font, download JetBrainsMono.zip
+from the Nerd Fonts release and install it under /usr/local/share/fonts.
+
+================================================================================
+ IMPORTANT NOTES
+================================================================================
+
+1. OpenRC + official binhost: some KDE/Qt packages may build from source
+   because the binhost's Plasma packages are built with systemd USE flags.
+   Base system, firmware, browser and many tools still come from binpkgs.
+
+2. plasma-login-manager is not recommended on OpenRC: it is ~amd64 in Gentoo
+   and upstream is systemd-oriented. SDDM is the supported OpenRC path.
+
+3. Secure Boot is not enabled on the current Arch install. TPM2 is present.
+   If you later enable Secure Boot, you must sign the UKI; not covered here.
+
+4. The Quectel EM120R-GL LTE modem needs net-misc/modemmanager only if you
+   want it managed by NetworkManager. The current Arch install did not have
+   ModemManager installed. Optional lines are in package.use/packages.txt.
+
+5. The current Arch install uses:
+     - root filesystem: XFS
+     - ESP: 1 GiB FAT32 at /boot
+     - zram: 4 GiB, zstd
+     - kernel cmdline: quiet splash zswap.enabled=0
+     - systemd-boot with UKI
+     - locale en_US.UTF-8, timezone Asia/Singapore, keymap us
+     - hostname "arch", user "jpl"
+   The configs in this directory reproduce those settings.
+
+================================================================================
+ END OF NOTES
+================================================================================

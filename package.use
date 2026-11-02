@@ -1,0 +1,58 @@
+# /etc/portage/package.use/gentoo-t14s
+#
+# Package-specific USE flags for this machine.
+# Global OpenRC/desktop flags are in make.conf.
+
+# ---------------------------------------------------------------------------
+# OpenRC session / desktop integration
+# ---------------------------------------------------------------------------
+sys-apps/dbus elogind -systemd
+sys-auth/elogind policykit pam
+sys-auth/polkit elogind -systemd
+x11-misc/sddm elogind -systemd
+sys-apps/fwupd elogind -systemd
+sys-auth/fprintd pam -systemd
+net-wireless/bluez -systemd extra-tools
+net-misc/networkmanager elogind -systemd dhcpcd -iwd
+net-wireless/wpa_supplicant dbus
+
+# ---------------------------------------------------------------------------
+# PipeWire (replaces PulseAudio server and provides JACK)
+# ---------------------------------------------------------------------------
+media-video/pipewire sound-server gstreamer pipewire-alsa jack-sdk bluetooth -systemd
+media-video/wireplumber elogind -systemd
+
+# ---------------------------------------------------------------------------
+# Minimal KDE Plasma 6 (Wayland)
+# ---------------------------------------------------------------------------
+kde-plasma/plasma-meta -X -discover -flatpak -firewall -grub -rdp -sdk -smart -cups -kwallet -accessibility -crypt
+kde-plasma/plasma-login-sessions -X
+
+# ---------------------------------------------------------------------------
+# Kernel / initramfs / boot
+# ---------------------------------------------------------------------------
+# Replicate the current Arch-style Unified Kernel Image (UKI) with dracut.
+# This puts one .efi file per kernel in /boot/EFI/Linux and lets systemd-boot
+# auto-discover it (same as the current Arch install).
+sys-kernel/installkernel dracut uki
+sys-apps/systemd-utils boot kernel-install
+sys-kernel/dracut -systemd
+sys-boot/plymouth -systemd
+
+# Alternative: classic systemd-boot BLS layout (kernel + initramfs + loader
+# entry). Comment the two lines above, uncomment these two.
+#sys-kernel/installkernel dracut systemd-boot
+#sys-apps/systemd-utils boot
+
+# ---------------------------------------------------------------------------
+# Firmware / microcode
+# ---------------------------------------------------------------------------
+sys-kernel/linux-firmware initramfs
+sys-firmware/intel-microcode initramfs
+
+# ---------------------------------------------------------------------------
+# Optional: WWAN (Quectel EM120R-GL) support through NetworkManager.
+# The hardware is present; Arch did not have ModemManager installed.
+# ---------------------------------------------------------------------------
+#net-misc/networkmanager modemmanager
+#net-misc/modemmanager mbim qmi

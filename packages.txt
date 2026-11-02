@@ -1,0 +1,129 @@
+# Packages to add explicitly to @world on the Gentoo T14s Gen 2i.
+# Install with:
+#   emerge --ask --verbose $(grep -vE '^[[:space:]]*(#|$)' /root/gentoo-config/packages.txt)
+#
+# Most KDE/Qt packages also come in through kde-plasma/plasma-meta; listing
+# the applications here makes the intended set explicit and keeps them in
+# @world after --depclean.
+
+# ---------------------------------------------------------------------------
+# Boot, kernel, firmware
+# ---------------------------------------------------------------------------
+sys-kernel/gentoo-kernel-bin
+sys-kernel/installkernel
+sys-kernel/dracut
+sys-kernel/linux-firmware
+sys-firmware/sof-firmware
+sys-firmware/intel-microcode
+sys-boot/plymouth
+sys-boot/efibootmgr
+sys-apps/systemd-utils
+sys-fs/xfsprogs
+sys-fs/dosfstools
+sys-block/zram-init
+
+# ---------------------------------------------------------------------------
+# Base system / administration
+# ---------------------------------------------------------------------------
+app-admin/sudo
+app-portage/gentoolkit
+app-portage/cpuid2cpuflags
+app-editors/nano
+dev-vcs/git
+net-misc/wget
+net-misc/curl
+sys-apps/pciutils
+sys-apps/usbutils
+sys-apps/dmidecode
+sys-apps/nvme-cli
+sys-apps/smartmontools
+sys-apps/lm-sensors
+sys-process/btop
+app-misc/fastfetch
+sys-apps/inxi
+app-shells/starship
+
+# ---------------------------------------------------------------------------
+# Fonts (Arch had ttf-jetbrains-mono and ttf-jetbrains-mono-nerd)
+# ---------------------------------------------------------------------------
+media-fonts/jetbrains-mono
+media-fonts/symbols-nerd-font
+media-fonts/noto
+media-fonts/noto-emoji
+
+# ---------------------------------------------------------------------------
+# KDE Plasma 6 minimal (Wayland) + the applications from the Arch install
+# ---------------------------------------------------------------------------
+kde-plasma/plasma-meta
+kde-plasma/plasma-nm
+kde-plasma/plasma-pa
+kde-plasma/bluedevil
+kde-plasma/powerdevil
+kde-plasma/systemsettings
+kde-plasma/kscreen
+kde-plasma/plasma-integration
+kde-plasma/polkit-kde-agent
+kde-plasma/xdg-desktop-portal-kde
+kde-apps/kio-extras
+kde-apps/thumbnailers
+kde-apps/ffmpegthumbs
+kde-apps/dolphin
+kde-apps/ark
+kde-apps/kate
+kde-apps/konsole
+kde-apps/spectacle
+media-sound/elisa
+x11-misc/sddm
+gui-libs/display-manager-init
+
+# ---------------------------------------------------------------------------
+# Audio / video / graphics
+# ---------------------------------------------------------------------------
+media-sound/alsa-utils
+media-video/pipewire
+media-video/wireplumber
+media-libs/libpulse
+sys-auth/rtkit
+media-video/mpv
+media-libs/mesa
+# Intel Vulkan (ANV) is built by Mesa: VIDEO_CARDS="intel" + USE="vulkan".
+# There is no separate media-libs/vulkan-intel package in Gentoo.
+media-libs/libva-intel-media-driver
+media-video/libva-utils
+dev-util/vulkan-tools
+x11-apps/mesa-progs
+
+# ---------------------------------------------------------------------------
+# Networking / Bluetooth / WWAN / power / fingerprint
+# ---------------------------------------------------------------------------
+net-misc/networkmanager
+net-wireless/wpa_supplicant
+net-wireless/bluez
+net-wireless/wireless-regdb
+sys-auth/elogind
+sys-auth/polkit
+sys-auth/fprintd
+sys-power/power-profiles-daemon
+sys-apps/fwupd
+sys-apps/bolt
+
+# Optional: only if you want the Quectel EM120R-GL LTE modem managed by
+# NetworkManager; Arch did not have ModemManager installed.
+#net-misc/modemmanager
+
+# Optional: SDDM Wayland/elogind workaround; see the SDDM wiki.
+#sys-auth/seatd
+
+# ---------------------------------------------------------------------------
+# Browser
+# ---------------------------------------------------------------------------
+www-client/google-chrome
+
+# ---------------------------------------------------------------------------
+# If emerge reports a package masked by ~amd64 (for example fastfetch or
+# starship on your snapshot), add a line like this to
+# /etc/portage/package.accept_keywords/gentoo-t14s:
+#
+# app-misc/fastfetch ~amd64
+# app-shells/starship ~amd64
+# ---------------------------------------------------------------------------
